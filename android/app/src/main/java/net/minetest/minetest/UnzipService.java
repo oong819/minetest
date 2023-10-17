@@ -100,9 +100,9 @@ public class UnzipService extends IntentService {
 	}
 
 	private Notification.Builder createNotification() {
-		String name = "net.minetest.minetest";
-		String channelId = "Minetest channel";
-		String description = "notifications from Minetest";
+		final String name = "net.minetest.minetest";
+		final String channelId = "Minetest channel";
+		final String description = "notifications from Minetest";
 		Notification.Builder builder;
 		if (mNotifyManager == null)
 			mNotifyManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
@@ -178,7 +178,7 @@ public class UnzipService extends IntentService {
 
 	void moveFileOrDir(@NonNull File src, @NonNull File dst) throws IOException {
 		try {
-			Process p = new ProcessBuilder("/system/bin/mv",
+			final Process p = new ProcessBuilder("/system/bin/mv",
 				src.getAbsolutePath(), dst.getAbsolutePath()).start();
 			int exitCode = p.waitFor();
 			if (exitCode != 0)
@@ -190,7 +190,7 @@ public class UnzipService extends IntentService {
 
 	boolean recursivelyDeleteDirectory(@NonNull File loc) {
 		try {
-			Process p = new ProcessBuilder("/system/bin/rm", "-rf",
+			final Process p = new ProcessBuilder("/system/bin/rm", "-rf",
 				loc.getAbsolutePath()).start();
 			return p.waitFor() == 0;
 		} catch (IOException | InterruptedException e) {
@@ -199,7 +199,7 @@ public class UnzipService extends IntentService {
 	}
 
 	private void publishProgress(@Nullable  Notification.Builder notificationBuilder, @StringRes int message, int progress) {
-		Intent intentUpdate = new Intent(ACTION_UPDATE);
+		final Intent intentUpdate = new Intent(ACTION_UPDATE);
 		intentUpdate.putExtra(ACTION_PROGRESS, progress);
 		intentUpdate.putExtra(ACTION_PROGRESS_MESSAGE, message);
 		if (!isSuccess)
