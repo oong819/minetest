@@ -27,6 +27,12 @@ core.features = {
 	get_light_data_buffer = true,
 	mod_storage_on_disk = true,
 	compress_zstd = true,
+	sound_params_start_time = true,
+	physics_overrides_v2 = true,
+	hud_def_type_field = true,
+	random_state_restore = true,
+	after_order_expiry_registration = true,
+	wallmounted_rotate = true,
 }
 
 function core.has_feature(arg)

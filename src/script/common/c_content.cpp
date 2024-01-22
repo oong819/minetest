@@ -136,6 +136,22 @@ void read_item_definition(lua_State* L, int index,
 	int place_param2;
 	if (getintfield(L, index, "place_param2", place_param2))
 		def.place_param2 = rangelim(place_param2, 0, U8_MAX);
+
+	getboolfield(L, index, "wallmounted_rotate_vertical", def.wallmounted_rotate_vertical);
+
+	lua_getfield(L, index, "touch_interaction");
+	if (!lua_isnil(L, -1)) {
+		luaL_checktype(L, -1, LUA_TTABLE);
+
+		TouchInteraction &inter = def.touch_interaction;
+		inter.pointed_nothing = (TouchInteractionMode)getenumfield(L, -1, "pointed_nothing",
+				es_TouchInteractionMode, inter.pointed_nothing);
+		inter.pointed_node = (TouchInteractionMode)getenumfield(L, -1, "pointed_node",
+				es_TouchInteractionMode, inter.pointed_node);
+		inter.pointed_object = (TouchInteractionMode)getenumfield(L, -1, "pointed_object",
+				es_TouchInteractionMode, inter.pointed_object);
+	}
+	lua_pop(L, 1);
 }
 
 /******************************************************************************/
@@ -195,6 +211,18 @@ void push_item_definition_full(lua_State *L, const ItemDefinition &i)
 	lua_setfield(L, -2, "sound_place_failed");
 	lua_pushstring(L, i.node_placement_prediction.c_str());
 	lua_setfield(L, -2, "node_placement_prediction");
+	lua_pushboolean(L, i.wallmounted_rotate_vertical);
+	lua_setfield(L, -2, "wallmounted_rotate_vertical");
+
+	lua_createtable(L, 0, 3);
+	const TouchInteraction &inter = i.touch_interaction;
+	lua_pushstring(L, es_TouchInteractionMode[inter.pointed_nothing].str);
+	lua_setfield(L, -2,"pointed_nothing");
+	lua_pushstring(L, es_TouchInteractionMode[inter.pointed_node].str);
+	lua_setfield(L, -2,"pointed_node");
+	lua_pushstring(L, es_TouchInteractionMode[inter.pointed_object].str);
+	lua_setfield(L, -2,"pointed_object");
+	lua_setfield(L, -2, "touch_interaction");
 }
 
 /******************************************************************************/
@@ -1959,8 +1987,28 @@ void push_objectRef(lua_State *L, const u16 id)
 
 void read_hud_element(lua_State *L, HudElement *elem)
 {
-	elem->type = (HudElementType)getenumfield(L, 2, "hud_elem_type",
-									es_HudElementType, HUD_ELEM_TEXT);
+	std::string type_string;
+	bool has_type = getstringfield(L, 2, "type", type_string);
+
+	// Handle deprecated hud_elem_type
+	std::string deprecated_type_string;
+	if (getstringfield(L, 2, "hud_elem_type", deprecated_type_string)) {
+		if (has_type && deprecated_type_string != type_string) {
+			log_deprecated(L, "Ambiguous HUD element fields \"type\" and \"hud_elem_type\", "
+					"\"type\" will be used.", 1, true);
+		} else {
+			has_type = true;
+			type_string = deprecated_type_string;
+			log_deprecated(L, "Deprecated \"hud_elem_type\" field, use \"type\" instead.",
+					1, true);
+		}
+	}
+
+	int type_enum;
+	if (has_type && string_to_enum(es_HudElementType, type_enum, type_string))
+		elem->type = static_cast<HudElementType>(type_enum);
+	else
+		elem->type = HUD_ELEM_TEXT;
 
 	lua_getfield(L, 2, "position");
 	elem->pos = lua_istable(L, -1) ? read_v2f(L, -1) : v2f();
@@ -1977,11 +2025,16 @@ void read_hud_element(lua_State *L, HudElement *elem)
 	elem->name    = getstringfield_default(L, 2, "name", "");
 	elem->text    = getstringfield_default(L, 2, "text", "");
 	elem->number  = getintfield_default(L, 2, "number", 0);
-	if (elem->type == HUD_ELEM_WAYPOINT)
-		// waypoints reuse the item field to store precision, item = precision + 1
-		elem->item = getintfield_default(L, 2, "precision", -1) + 1;
-	else
+	if (elem->type == HUD_ELEM_WAYPOINT) {
+		// Waypoints reuse the item field to store precision,
+		// item = precision + 1 and item = 0 <=> precision = 10 for backwards compatibility.
+		int precision = getintfield_default(L, 2, "precision", 10);
+		if (precision < 0)
+			throw LuaError("Waypoint precision must be non-negative");
+		elem->item = precision + 1;
+	} else {
 		elem->item = getintfield_default(L, 2, "item", 0);
+	}
 	elem->dir     = getintfield_default(L, 2, "direction", 0);
 	elem->z_index = MYMAX(S16_MIN, MYMIN(S16_MAX,
 			getintfield_default(L, 2, "z_index", 0)));
@@ -2033,8 +2086,10 @@ void push_hud_element(lua_State *L, HudElement *elem)
 	lua_setfield(L, -2, "number");
 
 	if (elem->type == HUD_ELEM_WAYPOINT) {
-		// waypoints reuse the item field to store precision, precision = item - 1
-		lua_pushnumber(L, elem->item - 1);
+		// Waypoints reuse the item field to store precision,
+		// item = precision + 1 and item = 0 <=> precision = 10 for backwards compatibility.
+		// See `Hud::drawLuaElements`, case `HUD_ELEM_WAYPOINT`.
+		lua_pushnumber(L, (elem->item == 0) ? 10 : (elem->item - 1));
 		lua_setfield(L, -2, "precision");
 	}
 	// push the item field for waypoints as well for backwards compatibility
@@ -2080,7 +2135,7 @@ bool read_hud_change(lua_State *L, HudElementStat &stat, HudElement *elem, void 
 			return false;
 		}
 
-		stat = (HudElementStat)statint;
+		stat = static_cast<HudElementStat>(statint);
 	}
 
 	switch (stat) {
@@ -2141,6 +2196,9 @@ bool read_hud_change(lua_State *L, HudElementStat &stat, HudElement *elem, void 
 		case HUD_STAT_STYLE:
 			elem->style = luaL_checknumber(L, 4);
 			*value = &elem->style;
+			break;
+		case HudElementStat_END:
+			return false;
 			break;
 	}
 

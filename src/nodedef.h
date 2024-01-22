@@ -45,13 +45,14 @@ class NodeResolver;
 class TestSchematic;
 #endif
 
-enum ContentParamType
+enum ContentParamType : u8
 {
 	CPT_NONE,
 	CPT_LIGHT,
+	ContentParamType_END // Dummy for validity check
 };
 
-enum ContentParamType2
+enum ContentParamType2 : u8
 {
 	CPT2_NONE,
 	// Need 8-bit param2
@@ -82,16 +83,19 @@ enum ContentParamType2
 	CPT2_4DIR,
 	// 6 bits of palette index, then 4dir
 	CPT2_COLORED_4DIR,
+	// Dummy for validity check
+	ContentParamType2_END
 };
 
-enum LiquidType
+enum LiquidType : u8
 {
 	LIQUID_NONE,
 	LIQUID_FLOWING,
 	LIQUID_SOURCE,
+	LiquidType_END // Dummy for validity check
 };
 
-enum NodeBoxType
+enum NodeBoxType : u8
 {
 	NODEBOX_REGULAR, // Regular block; allows buildable_to
 	NODEBOX_FIXED, // Static separately defined box(es)
@@ -189,7 +193,7 @@ public:
 	void readSettings();
 };
 
-enum NodeDrawType
+enum NodeDrawType : u8
 {
 	// A basic solid block
 	NDT_NORMAL,
@@ -233,6 +237,8 @@ enum NodeDrawType
 	NDT_MESH,
 	// Combined plantlike-on-solid
 	NDT_PLANTLIKE_ROOTED,
+	// Dummy for validity check
+	NodeDrawType_END
 };
 
 // Mesh options for NDT_PLANTLIKE with CPT2_MESHOPTIONS
@@ -252,13 +258,15 @@ enum AlignStyle : u8 {
 	ALIGN_STYLE_NODE,
 	ALIGN_STYLE_WORLD,
 	ALIGN_STYLE_USER_DEFINED,
+	AlignStyle_END // Dummy for validity check
 };
 
 enum AlphaMode : u8 {
 	ALPHAMODE_BLEND,
 	ALPHAMODE_CLIP,
 	ALPHAMODE_OPAQUE,
-	ALPHAMODE_LEGACY_COMPAT, /* means either opaque or clip */
+	ALPHAMODE_LEGACY_COMPAT, /* only sent by old servers, equals OPAQUE */
+	AlphaMode_END // Dummy for validity check
 };
 
 
@@ -466,11 +474,9 @@ struct ContentFeatures
 		case NDT_NORMAL:
 		case NDT_LIQUID:
 		case NDT_FLOWINGLIQUID:
-			alpha = ALPHAMODE_OPAQUE;
-			break;
 		case NDT_NODEBOX:
 		case NDT_MESH:
-			alpha = ALPHAMODE_LEGACY_COMPAT; // this should eventually be OPAQUE
+			alpha = ALPHAMODE_OPAQUE;
 			break;
 		default:
 			alpha = ALPHAMODE_CLIP;
@@ -529,16 +535,6 @@ struct ContentFeatures
 #endif
 
 private:
-#ifndef SERVER
-	/*
-	 * Checks if any tile texture has any transparent pixels.
-	 * Prints a warning and returns true if that is the case, false otherwise.
-	 * This is supposed to be used for use_texture_alpha backwards compatibility.
-	 */
-	bool textureAlphaCheck(ITextureSource *tsrc, const TileDef *tiles,
-		int length);
-#endif
-
 	void setAlphaFromLegacy(u8 legacy_alpha);
 
 	u8 getAlphaForLegacy() const;
